@@ -170,10 +170,12 @@ generatePlotPNG()
     fi
 }
 
+set -x
 commonJvmOptions="-Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -XX:-DeoptimizeRandom \
  -XX:CompileCommand=dontinline,compiler.codecache.stress.Helper$TestCase::method -XX:NativeMemoryTracking=summary"
 
-rm -rf java.log
+rm -rf java.log plot-data
+mkdir -p plot-data
 ${TESTJAVA}${FS}bin${FS}java ${TESTVMOPTS} ${TESTJAVAOPTS} -XX:+SegmentedCodeCache ${commonJvmOptions} \
  -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop 40 &> java.log &
 pid=$!

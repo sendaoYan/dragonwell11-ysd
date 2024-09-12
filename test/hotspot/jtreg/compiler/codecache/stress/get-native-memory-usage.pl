@@ -24,7 +24,6 @@ use strict;
 use warnings;
 use POSIX;
 use File::Path qw(make_path);
-use File::Path qw(remove_tree);
 my $verbose = 0;
 
 die "please input more than 2 jcmd native log files" if( @ARGV < 2 );
@@ -82,11 +81,10 @@ foreach my $file ( @ARGV )
     }
 }
 
-if( -d $plotDataDir )
+if( ! -d $plotDataDir )
 {
-    remove_tree($plotDataDir);
+    make_path($plotDataDir);
 }
-make_path($plotDataDir);
 
 open(my $csvFh, ">native-memory-summary.csv");
 open(my $summaryFh, ">native-memory-summary.txt");
