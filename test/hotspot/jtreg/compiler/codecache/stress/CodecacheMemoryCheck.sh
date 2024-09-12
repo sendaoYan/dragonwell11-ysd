@@ -119,25 +119,25 @@ getMemoryUsageFromProc()
         sleep 0.1  #wait util java main function start finish
     done
     rm -rf proc-*.log
-    echo -n "VmSize" > proc-VmSize.txt
-    echo -n "VmRSS" > proc-VmRSS.txt
-    echo -n "PageNum" > proc-PageNum.txt
+    echo -n "VmSize" > proc-VmSize.csv
+    echo -n "VmRSS" > proc-VmRSS.csv
+    echo -n "PageNum" > proc-PageNum.csv
     while kill -0 ${pid} 2>/dev/null
     do
         VmSize=`grep -w VmSize /proc/${pid}/status | awk '{print $2}'`
         VmRSS=`grep -w VmRSS /proc/${pid}/status | awk '{print $2}'`
         PageNum=`cat /proc/${pid}/statm | awk '{print $1}'`
         if kill -0 ${pid} ; then
-            echo -n ",${VmSize}" >> proc-VmSize.txt
-            echo -n ",${VmRSS}" >> proc-VmRSS.txt
-            echo -n ",${PageNum}" >> proc-PageNum.txt
+            echo -n ",${VmSize}" >> proc-VmSize.csv
+            echo -n ",${VmRSS}" >> proc-VmRSS.csv
+            echo -n ",${PageNum}" >> proc-PageNum.csv
         fi
         sleep 2
     done
-    echo "" >> proc-VmSize.txt
-    echo "" >> proc-VmRSS.txt
-    echo "" >> proc-PageNum.txt
-    cat proc-VmSize.txt proc-VmRSS.txt proc-PageNum.txt > proc.txt
+    echo "" >> proc-VmSize.csv
+    echo "" >> proc-VmRSS.csv
+    echo "" >> proc-PageNum.csv
+    cat proc-VmSize.csv proc-VmRSS.csv proc-PageNum.csv > proc.csv
 }
 
 generatePlotPNG()
@@ -150,9 +150,9 @@ generatePlotPNG()
         echo please install gnuplot command!
         return
     fi
-    for file in `ls plot-data | grep "\.txt$"`
+    for file in `ls plot-data | grep "\.csv$"`
     do
-        name=`basename $file .txt`
+        name=`basename $file .csv`
         echo plot ${name}
         gnuplot -c ${TESTSRC}/plot.gp "plot-data/${file}" "${name}" "plot-data/${name}.png"
     done
@@ -179,10 +179,9 @@ if grep -q "Unable to open socket file" *-native_memory-summary.log ; then
     exit 1
 fi
 
+perl ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
+generatePlotPNG
 perl ${TESTSRC}/check-native-memory-usage.pl 1 `ls *-native_memory-summary.log | sort -n | xargs`
 exitCode=$?
-if which gnuplot ; then
-
-fi
 
 exit ${exitCode}

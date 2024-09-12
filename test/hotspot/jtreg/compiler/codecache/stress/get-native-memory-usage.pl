@@ -19,7 +19,7 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: ~/jdk11u-dev/test/hotspot/jtreg/compiler/codecache/stress/check-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
 use POSIX;
