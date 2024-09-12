@@ -118,10 +118,12 @@ getMemoryUsageFromProc()
     do
         sleep 0.1  #wait util java main function start finish
     done
-    rm -rf proc-*.log
+    mkdir -p plot-data
+    rm -rf proc-*.csv plot-data/proc-*.txt
     echo -n "VmSize" > proc-VmSize.csv
     echo -n "VmRSS" > proc-VmRSS.csv
     echo -n "PageNum" > proc-PageNum.csv
+    i=0
     while kill -0 ${pid} 2>/dev/null
     do
         VmSize=`grep -w VmSize /proc/${pid}/status | awk '{print $2}'`
@@ -131,6 +133,10 @@ getMemoryUsageFromProc()
             echo -n ",${VmSize}" >> proc-VmSize.csv
             echo -n ",${VmRSS}" >> proc-VmRSS.csv
             echo -n ",${PageNum}" >> proc-PageNum.csv
+            echo "${i} ${VmSize}" >> plot-data/proc-VmSize.txt
+            echo "${i} ${VmRSS}" >> plot-data/proc-VmRSS.txt
+            echo "${i} ${PageNum}" >> plot-data/proc-PageNum.txt
+            let i++;
         fi
         sleep 2
     done
@@ -150,9 +156,9 @@ generatePlotPNG()
         echo please install gnuplot command!
         return
     fi
-    for file in `ls plot-data | grep "\.csv$"`
+    for file in `ls plot-data | grep "\.txt$"`
     do
-        name=`basename $file .csv`
+        name=`basename $file .txt`
         echo plot ${name}
         gnuplot -c ${TESTSRC}/plot.gp "plot-data/${file}" "${name}" "plot-data/${name}.png"
     done
@@ -169,7 +175,7 @@ commonJvmOptions="-Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteB
 
 rm -rf java.log
 ${TESTJAVA}${FS}bin${FS}java ${TESTVMOPTS} ${TESTJAVAOPTS} -XX:+SegmentedCodeCache ${commonJvmOptions} \
- -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop &> java.log &
+ -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop 40 &> java.log &
 pid=$!
 ps -ef | grep java | grep UnexpectedDeoptimizationTestLoop &> ps-java.log
 getMemoryUsageFromProc ${pid} java.log 2> proc-detail-stderr.log &
