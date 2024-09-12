@@ -90,6 +90,12 @@
   product(bool, G1BarrierSimple, false,                                     \
           "Use simple G1 post barrier")                                     \
                                                                             \
+  product(bool, ReduceNMethodSize, false,                                   \
+          "Move immutable data of nmethod out of code cache")               \
+                                                                            \
+    product(bool, UseBigDecimalOpt, true,                                   \
+          "use binary search in zero stripping of BigDecimal")              \
+                                                                            \
   //add new AJDK specific flags here
 
 
