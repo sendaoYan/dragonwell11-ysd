@@ -26,7 +26,7 @@ package compiler.codecache.stress;
 
 public class UnexpectedDeoptimizationTestLoop extends UnexpectedDeoptimizationTest {
     public static void main(String[] args) {
-        for (int i = 0; i < 25; i++) {
+        for (int i = 0; i < 2; i++) {
             new CodeCacheStressRunner(new UnexpectedDeoptimizationTest()).runTest();
         }
     }

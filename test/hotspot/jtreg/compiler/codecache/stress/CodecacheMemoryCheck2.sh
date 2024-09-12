@@ -23,13 +23,9 @@
 # @test
 # @key stress randomness
 # @summary check memory usage of optimizations and deoptimizations
-# @library /test/lib /
-# @modules java.base/jdk.internal.misc java.management
-# @build sun.hotspot.WhiteBox compiler.codecache.stress.Helper compiler.codecache.stress.TestCaseImpl
-# @build compiler.codecache.stress.UnexpectedDeoptimizationTest
 # @build compiler.codecache.stress.UnexpectedDeoptimizationTestLoop
 # @run driver ClassFileInstaller sun.hotspot.WhiteBox sun.hotspot.WhiteBox$WhiteBoxPermission
-# @run shell/timeout=36000 CodecacheMemoryCheck.sh
+# @run shell/timeout=3600 CodecacheMemoryCheck.sh
 
 
 # set a few environment variables so that the shell-script can run stand-alone
@@ -79,7 +75,7 @@ case "$OS" in
     ;;
 esac
 
-useJcmdPrintMemoryUsage()
+UseJcmdPrintMemoryUsage()
 {
     pid=$1
     javaLog=$2
@@ -108,36 +104,6 @@ useJcmdPrintMemoryUsage()
         let i++
         sleep 2
     done
-}
-
-getMemoryUsageFromProc()
-{
-    pid=$1
-    javaLog=$2
-    while ! grep -q "For random generator using seed" ${javaLog}
-    do
-        sleep 0.1  #wait util java main function start finish
-    done
-    rm -rf proc-*.log
-    echo -n "VmSize" > proc-VmSize.txt
-    echo -n "VmRSS" > proc-VmRSS.txt
-    echo -n "PageNum" > proc-PageNum.txt
-    while kill -0 ${pid} 2>/dev/null
-    do
-        VmSize=`grep -w VmSize /proc/${pid}/status | awk '{print $2}'`
-        VmRSS=`grep -w VmRSS /proc/${pid}/status | awk '{print $2}'`
-        PageNum=`cat /proc/${pid}/statm | awk '{print $1}'`
-        if kill -0 ${pid} ; then
-            echo -n ",${VmSize}" >> proc-VmSize.txt
-            echo -n ",${VmRSS}" >> proc-VmRSS.txt
-            echo -n ",${PageNum}" >> proc-PageNum.txt
-        fi
-        sleep 2
-    done
-    echo "" >> proc-VmSize.txt
-    echo "" >> proc-VmRSS.txt
-    echo "" >> proc-PageNum.txt
-    cat proc-VmSize.txt proc-VmRSS.txt proc-PageNum.txt > proc.txt
 }
 
 generatePlotPNG()
@@ -172,13 +138,11 @@ ${TESTJAVA}${FS}bin${FS}java ${TESTVMOPTS} ${TESTJAVAOPTS} -XX:+SegmentedCodeCac
  -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop &> java.log &
 pid=$!
 ps -ef | grep java | grep UnexpectedDeoptimizationTestLoop &> ps-java.log
-getMemoryUsageFromProc ${pid} java.log 2> proc-detail-stderr.log &
-useJcmdPrintMemoryUsage ${pid} java.log 2> jcmd-detail-stderr.log
+UseJcmdPrintMemoryUsage ${pid} java.log 2> jcmd-detail-stderr.log
 if grep -q "Unable to open socket file" *-native_memory-summary.log ; then
     echo 'jcmd report error: "-native_memory-summary.log"'
     exit 1
 fi
-
 perl ${TESTSRC}/check-native-memory-usage.pl 1 `ls *-native_memory-summary.log | sort -n | xargs`
 exitCode=$?
 if which gnuplot ; then
