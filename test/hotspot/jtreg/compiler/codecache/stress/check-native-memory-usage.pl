@@ -19,10 +19,10 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl ${TESTSRC}/check-native-memory-usage.pl 10 `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl ${TESTSRC}/check-native-memory-usage.pl 2 `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
-my $verbose = 0;
+my $verbose = 2;
 
 die "please input multiple and more than 2 jcmd native log files" if( @ARGV < 3 );
 my $multiple = shift @ARGV;
@@ -70,8 +70,19 @@ sub parserJcmdResult
         {
             $number = $1;
             die "filename=$filename\tline=$line can't get name!\n" if( length($name) <= 0 );
-            print("name=$name\t\tnumber=$number\n") if( $verbose == 1 );
-            $malloc{$name} = $number;
+            my $key = "$name" . "-malloc";
+            print("name=$key\t\tnumber=$number\n") if( $verbose == 1 );
+            $malloc{$key} = $number;
+            next;
+        }
+        if( $line =~ /\(mmap:.*committed=([0-9]+)KB/ )
+        {
+            $number = $1;
+            die "filename=$filename\tline=$line can't get name!\n" if( length($name) <= 0 );
+            my $key = "$name" . "-mmap";
+            print("name=$key\t\tnumber=$number\n") if( $verbose == 1 );
+            $malloc{$key} = $number;
+            next;
         }
     }
     close($fh);

@@ -46,6 +46,11 @@ if [ "${COMPILEJAVA}" = "" ]; then
   COMPILEJAVA="${TESTJAVA}"
 fi
 
+loopCount=40
+if [[ -n "$1" ]] ; then
+    loopCount=$1
+fi
+
 # set platform-dependent variables
 OS=`uname -s`
 case "$OS" in
@@ -83,9 +88,15 @@ useJcmdPrintMemoryUsage()
 {
     pid=$1
     javaLog=$2
+    i=0
     while ! grep -q "For random generator using seed" ${javaLog}
     do
         sleep 0.1  #wait util java main function start finish
+        if [[ $i -ge 100 ]] ; then
+            echo "The tested java seems work abnormally!"
+            exit 1
+        fi
+        let i++
     done
     i=0
     rm -rf *-native_memory-summary.log
@@ -114,9 +125,15 @@ getMemoryUsageFromProc()
 {
     pid=$1
     javaLog=$2
+    i=0
     while ! grep -q "For random generator using seed" ${javaLog}
     do
         sleep 0.1  #wait util java main function start finish
+        if [[ $i -ge 100 ]] ; then
+            echo "The tested java seems work abnormally!"
+            exit 1
+        fi
+        let i++
     done
     mkdir -p plot-data
     rm -rf proc-*.csv plot-data/proc-*.txt
@@ -172,12 +189,12 @@ generatePlotPNG()
 
 set -x
 commonJvmOptions="-Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteBoxAPI -XX:-DeoptimizeRandom \
- -XX:CompileCommand=dontinline,compiler.codecache.stress.Helper$TestCase::method -XX:NativeMemoryTracking=summary"
+ -XX:CompileCommand=dontinline,compiler.codecache.stress.Helper\$TestCase::method -XX:NativeMemoryTracking=summary"
 
 rm -rf java.log plot-data
 mkdir -p plot-data
 ${TESTJAVA}${FS}bin${FS}java ${TESTVMOPTS} ${TESTJAVAOPTS} -XX:+SegmentedCodeCache ${commonJvmOptions} \
- -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop 40 &> java.log &
+ -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop ${loopCount} &> java.log &
 pid=$!
 ps -ef | grep java | grep UnexpectedDeoptimizationTestLoop &> ps-java.log
 getMemoryUsageFromProc ${pid} java.log 2> proc-detail-stderr.log &
@@ -187,9 +204,11 @@ if grep -q "Unable to open socket file" *-native_memory-summary.log ; then
     exit 1
 fi
 
-perl ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
+( set +x ; perl ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs` )
 generatePlotPNG
-perl ${TESTSRC}/check-native-memory-usage.pl 1 `ls *-native_memory-summary.log | sort -n | xargs`
+( set +x ; perl ${TESTSRC}/check-native-memory-usage.pl 1 `ls *-native_memory-summary.log | sort -n | xargs` )
 exitCode=$?
+
+mkdir -p native_memory-summary ; mv *-native_memory-summary.log native_memory-summary/
 
 exit ${exitCode}
