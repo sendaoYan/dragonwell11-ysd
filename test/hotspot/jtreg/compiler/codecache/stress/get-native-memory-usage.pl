@@ -19,7 +19,7 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
 use POSIX;
@@ -35,11 +35,16 @@ my %resultMaxIndex;
 my %resultMinValue;
 my %resultMinIndex;
 my %resultQuarterValue;
+my %resultThirdValue;
+my %resultHalfValue;
+my %resultLastValue;
 my $plotDataDir = "plot-data";
 my $lastFile = $ARGV[-1];
 $lastFile =~ /^([0-9]+)-.*?/;
 my $lastIndex = $1;
 my $quarterIndex = ceil($lastIndex / 4);
+my $thirdIndex = ceil($lastIndex / 3);
+my $halfIndex = ceil($lastIndex / 2);
 die "lastIndex undefine!" if( ! defined $lastIndex );
 
 foreach my $key ( sort keys %$baseline )
@@ -78,6 +83,18 @@ foreach my $file ( @ARGV )
         {
             $resultQuarterValue{$key} = $value;
         }
+        if( $index == $thirdIndex )
+        {
+            $resultThirdValue{$key} = $value;
+        }
+        if( $index == $halfIndex )
+        {
+            $resultHalfValue{$key} = $value;
+        }
+        if( $index == $lastIndex )
+        {
+            $resultLastValue{$key} = $value;
+        }
     }
 }
 
@@ -88,7 +105,7 @@ if( ! -d $plotDataDir )
 
 open(my $csvFh, ">native-memory-summary.csv");
 open(my $summaryFh, ">native-memory-summary.txt");
-print $summaryFh ("total $lastIndex files, quarter index is $quarterIndex.\n");
+print $summaryFh ("total $lastIndex files, quarter index is $quarterIndex, third index is $thirdIndex, half index is $halfIndex.\n");
 foreach my $key ( sort @nameArray )
 {
     print $csvFh "$resultCsv{$key}\n";
@@ -98,9 +115,16 @@ foreach my $key ( sort @nameArray )
         print("$key minimum vaule is $minValue, the minimum value will set to 0.01 to log file.\n");
         $minValue = 0.01;
     }
-    my $maxMultiple = ceil($resultMaxValue{$key} / $minValue);
-    my $quartermultiple = ceil($resultQuarterValue{$key} / $minValue);
-    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$minValue,index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key}\tmax/min=$maxMultiple\tquarter/mix=$quartermultiple\n";
+    my $maxMultiple = sprintf("%.1f", $resultMaxValue{$key} / $minValue);
+    my $quarterMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultQuarterValue{$key});
+    my $thirdMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultThirdValue{$key});
+    my $halfMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultHalfValue{$key});
+    my $thirdSurprise = "";
+    if( $thirdMultiple >= 2.0 )
+    {
+        $thirdSurprise = "!!";
+    }
+    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$minValue,index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key},half=$resultHalfValue{$key}\tmax/min=$maxMultiple\tlast/quarter=$quarterMultiple\tlast/third=$thirdMultiple$thirdSurprise\tlast/half=$halfMultiple\n";
 
     #write plot data
     my @data = split /,/, $resultCsv{$key};

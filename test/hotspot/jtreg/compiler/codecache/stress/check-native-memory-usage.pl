@@ -19,33 +19,30 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl ${TESTSRC}/check-native-memory-usage.pl 2 `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl -w ${TESTSRC}/check-native-memory-usage.pl "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
-my $verbose = 2;
+use POSIX;
+my $verbose = 0;
 
-die "please input multiple and more than 2 jcmd native log files" if( @ARGV < 3 );
-my $multiple = shift @ARGV;
-my $baseline = parserJcmdResult(shift(@ARGV));
-foreach my $file ( @ARGV )
+die "please input rules and more than 2 jcmd native log files" if( @ARGV < 3 );
+my $rules = shift @ARGV;
+my $lastIndexResultHash = parserJcmdResult(pop(@ARGV));
+my $thirdIndexResultHash = parserJcmdResult($ARGV[ceil(scalar(@ARGV)/3)]);
+
+foreach my $rule ( split /,/, $rules )
 {
-    my $data = parserJcmdResult($file);
-    foreach my $key ( keys %$data )
+    print("rule: $rule\n");
+    my($moduleName, $coefficient) = split /:/, $rule;
+    print("$moduleName: $coefficient\n") if( $verbose > 3 );
+    my $lastIndexValue = $lastIndexResultHash->{$moduleName};
+    my $thirdIndexValue = $thirdIndexResultHash->{$moduleName};
+    die "can't find $moduleName memory usage information!" if( ! defined $lastIndexValue );
+    die "can't find $moduleName memory usage information!" if( ! defined $thirdIndexValue );
+    my $compareValue = $thirdIndexValue * $coefficient;
+    if( $lastIndexValue > $compareValue )
     {
-        my $currentValue = $data->{$key};
-        my $baselineValue = $baseline->{$key};
-        print("$file:$key: $currentValue -> $baselineValue\n") if($verbose == 2);
-        my $coefficient = 1;        
-        $coefficient = 5 if( "Code" eq "$key" );
-        $coefficient = 20 if( "Class" eq "$key" );
-        $coefficient = 20 if( "Module" eq "$key" );
-        $coefficient = 20 if( "Synchronizer" eq "$key" );
-        $coefficient = 10 if( "ArenaChunk" eq "$key" );
-        my $compareValue = $baselineValue * $multiple * $coefficient;
-        if( $currentValue > $compareValue )
-        {
-            die "$file:$key: $currentValue > $compareValue=$baselineValue*$multiple*$coefficient";
-        }
+        die "$moduleName: $lastIndexValue > $compareValue=$thirdIndexValue*$coefficient";
     }
 }
 
