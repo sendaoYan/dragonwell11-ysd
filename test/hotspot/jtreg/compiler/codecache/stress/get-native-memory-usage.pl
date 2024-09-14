@@ -92,9 +92,15 @@ print $summaryFh ("total $lastIndex files, quarter index is $quarterIndex.\n");
 foreach my $key ( sort @nameArray )
 {
     print $csvFh "$resultCsv{$key}\n";
-    my $maxMultiple = ceil($resultMaxValue{$key} / $resultMinValue{$key});
-    my $quartermultiple = ceil($resultQuarterValue{$key} / $resultMinValue{$key});
-    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$resultMinValue{$key},index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key}\tmax/min=$maxMultiple\tquarter/mix=$quartermultiple\n";
+    my $minValue = $resultMinValue{$key};
+    if( $minValue == 0 )
+    {
+        print("$key minimum vaule is $minValue, the minimum value will set to 0.01 to log file.\n");
+        $minValue = 0.01;
+    }
+    my $maxMultiple = ceil($resultMaxValue{$key} / $minValue);
+    my $quartermultiple = ceil($resultQuarterValue{$key} / $minValue);
+    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$minValue,index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key}\tmax/min=$maxMultiple\tquarter/mix=$quartermultiple\n";
 
     #write plot data
     my @data = split /,/, $resultCsv{$key};

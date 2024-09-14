@@ -29,7 +29,7 @@
 # @build compiler.codecache.stress.UnexpectedDeoptimizationTest
 # @build compiler.codecache.stress.UnexpectedDeoptimizationTestLoop
 # @run driver ClassFileInstaller sun.hotspot.WhiteBox sun.hotspot.WhiteBox$WhiteBoxPermission
-# @run shell/timeout=36000 CodecacheMemoryCheck.sh
+# @run shell/timeout=7200 CodecacheMemoryCheck.sh
 
 
 # set a few environment variables so that the shell-script can run stand-alone
@@ -104,7 +104,7 @@ useJcmdPrintMemoryUsage()
     do
         ${TESTJAVA}${FS}bin${FS}jcmd ${pid} VM.native_memory summary &> ${i}-native_memory-summary.log
         if [[ 0 -ne $? ]] ; then
-            if grep -q "Exception" ${i}-native_memory-summary.log ; then
+            if grep -q "Exception" ${i}-native_memory-summary.log || ! kill -0 ${pid} ; then
                 #The target java process has been teminated/finished
                 #java.io.IOException: No such process
                 #com.sun.tools.attach.AttachNotSupportedException: Unable to parse namespace
@@ -112,8 +112,13 @@ useJcmdPrintMemoryUsage()
                 mv ${i}-native_memory-summary.log jcmd-exception.log
                 break
             else
-                echo "jcmd command execute fail!"
-                exit 1
+                if kill -0 $$ ; then
+                    echo "jcmd command execute fail!"
+                    exit 1
+                else
+                    mv ${i}-native_memory-summary.log jcmd-error.log
+                    break
+                fi
             fi
         fi
         let i++
@@ -193,7 +198,7 @@ commonJvmOptions="-Xbootclasspath/a:. -XX:+UnlockDiagnosticVMOptions -XX:+WhiteB
 
 rm -rf java.log plot-data
 mkdir -p plot-data
-${TESTJAVA}${FS}bin${FS}java ${TESTVMOPTS} ${TESTJAVAOPTS} -XX:+SegmentedCodeCache ${commonJvmOptions} \
+${TESTJAVA}${FS}bin${FS}java ${TESTVMOPTS} ${TESTJAVAOPTS} ${commonJvmOptions} \
  -Dtest.src=${TESTSRC} -cp ${TESTCLASSPATH} compiler.codecache.stress.UnexpectedDeoptimizationTestLoop ${loopCount} &> java.log &
 pid=$!
 ps -ef | grep java | grep UnexpectedDeoptimizationTestLoop &> ps-java.log
