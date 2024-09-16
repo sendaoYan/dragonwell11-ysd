@@ -209,10 +209,10 @@ if grep -q "Unable to open socket file" *-native_memory-summary.log ; then
     exit 1
 fi
 
-( set +x ; perl -w ${TESTSRC}/check-native-memory-usage.pl 25 "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs` )
+( set +x ; perl -w ${TESTSRC}/get-native-memory-usage.pl 25 "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs` )
 exitCode=$?
-generatePlotPNG
+generatePlotPNG &> generatePlotPNG.log
 
-mkdir -p native_memory-summary ; mv *-native_memory-summary.log native_memory-summary/
+( set +x ; mkdir -p native_memory-summary ; mv *-native_memory-summary.log native_memory-summary/ )
 
 exit ${exitCode}
