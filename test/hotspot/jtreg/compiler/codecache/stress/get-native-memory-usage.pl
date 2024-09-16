@@ -19,7 +19,7 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl 25 `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl 25 "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
 use POSIX;
@@ -28,6 +28,7 @@ my $verbose = 0;
 
 die "please input split number and more than 3 jcmd native log files" if( @ARGV < 10 );
 my $split = shift(@ARGV);
+my $rules = shift(@ARGV);
 my $baseline = parserJcmdResult(shift(@ARGV));
 my @nameArray;
 my %resultCsv;
@@ -39,6 +40,8 @@ my %resultQuarterValue;
 my %resultThirdValue;
 my %resultHalfValue;
 my %resultLastValue;
+my %isIncreasementalResultHash;
+my $memoryLeakNumber = 0;
 my $plotDataDir = "plot-data";
 my $lastFile = $ARGV[-1];
 $lastFile =~ /^([0-9]+)-.*?/;
@@ -126,6 +129,7 @@ foreach my $key ( sort @nameArray )
     my $halfMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultHalfValue{$key});
     my $thirdSurprise = "";
     my $isIncreasementalResult = isIncreasemental(@data);
+    $isIncreasementalResultHash{$name} = $isIncreasementalResult;
     my $isMemoryLeak = "";
     if( $thirdMultiple >= 2.5 )
     {
@@ -149,6 +153,30 @@ foreach my $key ( sort @nameArray )
 }
 close($csvFh);
 close($summaryFh);
+
+
+my $lastIndexResultHash = parserJcmdResult($ARGV[-1]);
+my $thirdIndexResultHash = parserJcmdResult($ARGV[ceil(scalar(@ARGV)/3)]);
+foreach my $rule ( split /,/, $rules )
+{
+    print("rule: $rule\n");
+    my($moduleName, $coefficient) = split /:/, $rule;
+    print("$moduleName: $coefficient\n") if( $verbose > 3 );
+    my $lastIndexValue = $lastIndexResultHash->{$moduleName};
+    my $thirdIndexValue = $thirdIndexResultHash->{$moduleName};
+    die "can't find $moduleName memory usage information!" if( ! defined $lastIndexValue );
+    die "can't find $moduleName memory usage information!" if( ! defined $thirdIndexValue );
+    my $compareValue = $thirdIndexValue * $coefficient;
+    if( $lastIndexValue > $compareValue && $isIncreasementalResultHash{$moduleName} == 0 )
+    {
+        warn("$moduleName: $lastIndexValue > $compareValue=$thirdIndexValue*$coefficient");
+        $memoryLeakNumber++;
+    }
+}
+if( $memoryLeakNumber > 0 )
+{
+    die "memoryLeakNumber=$memoryLeakNumber!";
+}
 
 
 
