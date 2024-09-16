@@ -19,14 +19,15 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl 25 `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
 use POSIX;
 use File::Path qw(make_path);
 my $verbose = 0;
 
-die "please input more than 2 jcmd native log files" if( @ARGV < 2 );
+die "please input split number and more than 3 jcmd native log files" if( @ARGV < 10 );
+my $split = shift(@ARGV);
 my $baseline = parserJcmdResult(shift(@ARGV));
 my @nameArray;
 my %resultCsv;
@@ -108,6 +109,10 @@ open(my $summaryFh, ">native-memory-summary.txt");
 print $summaryFh ("total $lastIndex files, quarter index is $quarterIndex, third index is $thirdIndex, half index is $halfIndex.\n");
 foreach my $key ( sort @nameArray )
 {
+    my @data = split /,/, $resultCsv{$key};
+    my $name = shift(@data);
+    die "key=$key != name=$name" if( $name ne $key );
+
     print $csvFh "$resultCsv{$key}\n";
     my $minValue = $resultMinValue{$key};
     if( $minValue == 0 )
@@ -120,15 +125,19 @@ foreach my $key ( sort @nameArray )
     my $thirdMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultThirdValue{$key});
     my $halfMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultHalfValue{$key});
     my $thirdSurprise = "";
-    if( $thirdMultiple >= 2.0 )
+    my $isIncreasementalResult = isIncreasemental(@data);
+    my $isMemoryLeak = "";
+    if( $thirdMultiple >= 2.5 )
     {
         $thirdSurprise = "!!";
+        if( $isIncreasementalResult == 0 )
+        {
+            $isMemoryLeak = "\tMemoryLeak!!!"
+        }
     }
-    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$minValue,index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key},half=$resultHalfValue{$key}\tmax/min=$maxMultiple\tlast/quarter=$quarterMultiple\tlast/third=$thirdMultiple$thirdSurprise\tlast/half=$halfMultiple\n";
+    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$minValue,index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key},third=$resultThirdValue{$key},half=$resultHalfValue{$key}\tmax/min=$maxMultiple,last/quarter=$quarterMultiple,last/half=$halfMultiple,last/third=$thirdMultiple$thirdSurprise\tisIncreasemental=$isIncreasementalResult$isMemoryLeak\n";
 
     #write plot data
-    my @data = split /,/, $resultCsv{$key};
-    my $name = shift(@data);
     my $i = 0;
     open(my $fh, ">$plotDataDir/$name.txt");
     foreach my $value ( @data )
@@ -182,3 +191,64 @@ sub parserJcmdResult
     close($fh);
     return \%malloc;
 };
+
+sub isIncreasemental
+{
+    my @array = @_;
+    my $length = scalar(@array);
+    my $windowLength = floor($length/$split);
+    warn("windowLength=$windowLength\n") if( $verbose > 0 );
+    my $count = $windowLength * $split;
+    warn("count=$count, $length=$length\n")  if( $verbose > 0 );;
+    my $previousSum = 0;
+    my $steady = 0;
+    my $result = 0;
+
+    #calculate the main part data
+    foreach my $i ( 0..$split-1 )
+    {
+        my $currentSum = 0;
+        foreach my $j (0..$windowLength-1)
+        {
+            my $index = $i*$windowLength+$j;
+            $currentSum += $array[$i*$windowLength+$j];
+        }
+        $currentSum /= $windowLength;
+        warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 3 );
+        if( $currentSum < $previousSum )
+        {
+            $result++;
+            warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
+        }
+        elsif( $currentSum == $previousSum )
+        {
+            $steady++;
+        }
+        $previousSum = $currentSum;
+    }
+
+    #calculate the tail data
+    my $currentSum = 0;
+    foreach my $i ( $count .. ($length-1) )
+    {
+        $currentSum += $array[$i];;
+    }
+    $currentSum /= ($length-$count);
+    if( $currentSum < $previousSum )
+    {
+        $result++;
+        warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
+    }
+    elsif( $currentSum == $previousSum )
+    {
+        $steady++;
+    }
+
+    #statistics the result
+    warn("steady=$steady, split=$split\n") if( $verbose >= 2 );
+    if( $steady == $split )
+    {
+        $result = -1;
+    }
+    return $result;
+}

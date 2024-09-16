@@ -19,16 +19,24 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl -w ${TESTSRC}/check-native-memory-usage.pl "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl -w ${TESTSRC}/check-native-memory-usage.pl 25 "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
 use POSIX;
 my $verbose = 0;
 
-die "please input rules and more than 2 jcmd native log files" if( @ARGV < 3 );
+die "please input split number, rules and more than 3 jcmd native log files" if( @ARGV < 10 );
+my $split = shift @ARGV;
 my $rules = shift @ARGV;
-my $lastIndexResultHash = parserJcmdResult(pop(@ARGV));
+my $lastIndexResultHash = parserJcmdResult($ARGV[-1]);
 my $thirdIndexResultHash = parserJcmdResult($ARGV[ceil(scalar(@ARGV)/3)]);
+my %isIncreasementalResult;
+my @allData;
+foreach my $file ( @ARGV )
+{
+    my $result = parserJcmdResult($file);
+    push @allData, $result;
+}
 
 foreach my $rule ( split /,/, $rules )
 {
@@ -85,3 +93,64 @@ sub parserJcmdResult
     close($fh);
     return \%malloc;
 };
+
+sub isIncreasemental
+{
+    my @array = @_;
+    my $length = scalar(@array);
+    my $windowLength = floor($length/$split);
+    warn("windowLength=$windowLength\n") if( $verbose > 0 );
+    my $count = $windowLength * $split;
+    warn("count=$count, $length=$length\n")  if( $verbose > 0 );;
+    my $previousSum = 0;
+    my $steady = 0;
+    my $result = 0;
+
+    #calculate the main part data
+    foreach my $i ( 0..$split-1 )
+    {
+        my $currentSum = 0;
+        foreach my $j (0..$windowLength-1)
+        {
+            my $index = $i*$windowLength+$j;
+            $currentSum += $array[$i*$windowLength+$j];
+        }
+        $currentSum /= $windowLength;
+        warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 3 );
+        if( $currentSum < $previousSum )
+        {
+            $result++;
+            warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
+        }
+        elsif( $currentSum == $previousSum )
+        {
+            $steady++;
+        }
+        $previousSum = $currentSum;
+    }
+
+    #calculate the tail data
+    my $currentSum = 0;
+    foreach my $i ( $count .. ($length-1) )
+    {
+        $currentSum += $array[$i];;
+    }
+    $currentSum /= ($length-$count);
+    if( $currentSum < $previousSum )
+    {
+        $result++;
+        warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
+    }
+    elsif( $currentSum == $previousSum )
+    {
+        $steady++;
+    }
+
+    #statistics the result
+    warn("steady=$steady, split=$split\n") if( $verbose >= 2 );
+    if( $steady == $split )
+    {
+        $result = -1;
+    }
+    return $result;
+}
