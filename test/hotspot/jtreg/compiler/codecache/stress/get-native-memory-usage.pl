@@ -288,7 +288,6 @@ sub isIncreasemental
     }
     else
     {
-        warn("$name: tail count is zero.\n");
         warn("$name: tail count is zero.\n") if( $verbose >= 1 );
     }
 
