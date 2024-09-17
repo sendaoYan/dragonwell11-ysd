@@ -19,7 +19,7 @@
 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
 # or visit www.oracle.com if you need additional information or have any
 # questions.
-#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl 25 "Code-malloc:2.6,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs`
+#usage: perl -w ${TESTSRC}/get-native-memory-usage.pl 25 "Code-malloc:2.5,Code-mmap:2.8,Compiler-malloc:4.6" `ls *-native_memory-summary.log | sort -n | xargs`
 use strict;
 use warnings;
 use POSIX;
