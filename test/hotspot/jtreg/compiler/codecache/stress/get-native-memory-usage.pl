@@ -117,18 +117,12 @@ foreach my $key ( sort @nameArray )
     die "key=$key != name=$name" if( $name ne $key );
 
     print $csvFh "$resultCsv{$key}\n";
-    my $minValue = $resultMinValue{$key};
-    if( $minValue == 0 )
-    {
-        print("$key minimum vaule is $minValue, the minimum value will set to 0.01 to log file.\n");
-        $minValue = 0.01;
-    }
-    my $maxMultiple = sprintf("%.1f", $resultMaxValue{$key} / $minValue);
+    my $maxMultiple = sprintf("%.1f", $resultMaxValue{$key} / $resultMinValue{$key});
     my $quarterMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultQuarterValue{$key});
     my $thirdMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultThirdValue{$key});
     my $halfMultiple = sprintf("%.1f", $resultLastValue{$key} / $resultHalfValue{$key});
     my $thirdSurprise = "";
-    my $isIncreasementalResult = isIncreasemental(@data);
+    my $isIncreasementalResult = isIncreasemental($name, @data);
     $isIncreasementalResultHash{$name} = $isIncreasementalResult;
     my $isMemoryLeak = "";
     if( $thirdMultiple >= 2.5 )
@@ -139,7 +133,7 @@ foreach my $key ( sort @nameArray )
             $isMemoryLeak = "\tMemoryLeak!!!"
         }
     }
-    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$minValue,index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key},third=$resultThirdValue{$key},half=$resultHalfValue{$key}\tmax/min=$maxMultiple,last/quarter=$quarterMultiple,last/half=$halfMultiple,last/third=$thirdMultiple$thirdSurprise\tisIncreasemental=$isIncreasementalResult$isMemoryLeak\n";
+    print $summaryFh "$key\tmax=$resultMaxValue{$key},index=$resultMaxIndex{$key}\tmin=$resultMinValue{$key},index=$resultMinIndex{$key}\tquarter=$resultQuarterValue{$key},third=$resultThirdValue{$key},half=$resultHalfValue{$key}\tmax/min=$maxMultiple,last/quarter=$quarterMultiple,last/half=$halfMultiple,last/third=$thirdMultiple$thirdSurprise\tisIncreasemental=$isIncreasementalResult$isMemoryLeak\n";
 
     #write plot data
     my $i = 0;
@@ -203,6 +197,14 @@ sub parserJcmdResult
             die "filename=$filename\tline=$line can't get name!\n" if( length($name) <= 0 );
             my $key = "$name" . "-malloc";
             print("name=$key\t\tnumber=$number\n") if( $verbose == 1 );
+            if( $number == 0 )
+            {
+                if( $verbose > 0 )
+                {
+                    warn("$key value is 0");
+                }
+                $number = 0.01;
+            }
             $malloc{$key} = $number;
             next;
         }
@@ -212,6 +214,14 @@ sub parserJcmdResult
             die "filename=$filename\tline=$line can't get name!\n" if( length($name) <= 0 );
             my $key = "$name" . "-mmap";
             print("name=$key\t\tnumber=$number\n") if( $verbose == 1 );
+            if( $number == 0 )
+            {
+                if( $verbose > 0 )
+                {
+                    warn("$key value is 0");
+                }
+                $number = 1;
+            }
             $malloc{$key} = $number;
             next;
         }
@@ -222,12 +232,13 @@ sub parserJcmdResult
 
 sub isIncreasemental
 {
+    my $name = shift(@_);
     my @array = @_;
     my $length = scalar(@array);
     my $windowLength = floor($length/$split);
-    warn("windowLength=$windowLength\n") if( $verbose > 0 );
+    warn("$name: windowLength=$windowLength\n") if( $verbose > 0 );
     my $count = $windowLength * $split;
-    warn("count=$count, $length=$length\n")  if( $verbose > 0 );;
+    warn("$name: count=$count, $length=$length\n")  if( $verbose > 0 );;
     my $previousSum = 0;
     my $steady = 0;
     my $result = 0;
@@ -242,11 +253,11 @@ sub isIncreasemental
             $currentSum += $array[$i*$windowLength+$j];
         }
         $currentSum /= $windowLength;
-        warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 3 );
+        warn("$name: currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 3 );
         if( $currentSum < $previousSum )
         {
             $result++;
-            warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
+            warn("$name: currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
         }
         elsif( $currentSum == $previousSum )
         {
@@ -255,25 +266,34 @@ sub isIncreasemental
         $previousSum = $currentSum;
     }
 
+    # warn("$name: steady=$steady, split=$split\n") if( $verbose >= 0 );
     #calculate the tail data
-    my $currentSum = 0;
-    foreach my $i ( $count .. ($length-1) )
+    if( ($length-$count) != 0 )
     {
-        $currentSum += $array[$i];;
+        my $currentSum = 0;
+        foreach my $i ( $count .. ($length-1) )
+        {
+            $currentSum += $array[$i];;
+        }
+        $currentSum /= ($length-$count);
+        if( $currentSum < $previousSum )
+        {
+            $result++;
+            warn("$name: currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
+        }
+        elsif( $currentSum == $previousSum || abs($currentSum-$previousSum) > 0.1 )
+        {
+            $steady++;
+        }
     }
-    $currentSum /= ($length-$count);
-    if( $currentSum < $previousSum )
+    else
     {
-        $result++;
-        warn("currentSum=$currentSum, previousSum=$previousSum\n") if( $verbose >= 1 );
-    }
-    elsif( $currentSum == $previousSum )
-    {
-        $steady++;
+        warn("$name: tail count is zero.\n");
+        warn("$name: tail count is zero.\n") if( $verbose >= 1 );
     }
 
     #statistics the result
-    warn("steady=$steady, split=$split\n") if( $verbose >= 2 );
+    warn("$name: steady=$steady, split=$split\n") if( $verbose >= 2 );
     if( $steady == $split )
     {
         $result = -1;
