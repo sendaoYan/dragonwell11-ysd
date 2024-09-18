@@ -174,6 +174,10 @@ generatePlotPNG()
         echo "echo plot-data directory not exist!"
         return
     fi
+    if [[ ! -f ${TESTSRC}/plot.gp ]] ; then
+        echo "${TESTSRC}/plot.gp not exists!"
+        return
+    fi
     if ! which gnuplot ; then
         echo please install gnuplot command!
         return
